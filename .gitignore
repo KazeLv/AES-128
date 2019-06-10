@@ -1,0 +1,8 @@
+#ignore file for git
+
+#ignore compile and execute files
+*.o
+*.exe
+
+#ignore vscode folder
+.vscode/
