@@ -5,11 +5,12 @@
 //加密轮数：10
 
 #include<iostream>
+#include<vector>
 
 using namespace std;
 
 using byte_t = unsigned char;
-using word_t = byte_t[4];
+using word_t = uint32_t;
 
 static const byte_t S_BOX[16][16] = {0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
 									 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -121,20 +122,37 @@ void add_round_key(byte_t block[4][4], byte_t key[4][4]){
 void key_expansion(byte_t key[16], byte_t result[176]){
 	word_t word_keys[44];
 	for (int i = 0; i < 4; i++){
-		word_keys[i][0] = key[4 * i + 0];
-		word_keys[i][1] = key[4 * i + 1];
-		word_keys[i][2] = key[4 * i + 0];
-		word_keys[i][3] = key[4 * i + 0];
+		word_keys[i] = key[4 * i + 0] << 24 + 
+					   key[4 * i + 1] << 16 + 
+					   key[4 * i + 2] << 8 + 
+					   key[4 * i + 3];
 	}
 
 	for (int i = 4; i <= 44; i++){
-		//word_t tmp = word_keys[i - 1];
-		if(4 % i == 0){
+		word_t tmp = word_keys[i - 1];
+		if(i % 4 == 0){
 			//新一轮的开始，根据G函数流程计算异或操作数
-			//TODO
+			byte_t word_tmp[4] = {
+				(tmp << 8 ) / 0x01000000,
+				(tmp << 16) / 0x01000000,
+				(tmp << 24) / 0x01000000,
+				tmp / 0x01000000,
+			};
+
+			for (int i = 0; i < 4;i++){
+				int row = word_tmp[i] / 0x10;
+				int col = word_tmp[i] % 0x10;
+				word_tmp[i] = S_BOX[row][col];
+			}
+
+			word_tmp[0] ^= RCON[i / 4];
+			tmp = (word_t)word_tmp[0] << 24;
+			tmp = (word_t)word_tmp[1] << 16;
+			tmp = (word_t)word_tmp[2] << 8;
+			tmp = (word_t)word_tmp[3];
 		}
 
-		//word_keys[i] = word_keys[i - 4] ^ tmp;
+		word_keys[i] = word_keys[i - 4] ^ tmp;
 	}
 
 	
@@ -159,3 +177,4 @@ byte_t operator_multi(byte_t a, byte_t b){
 	}
 	return res;
 }
+
