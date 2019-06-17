@@ -13,5 +13,5 @@ void add_round_key(byte_t block[4][4], byte_t key[4][4]);
 void key_expansion(byte_t key[4][4], byte_t result[11][4][4]);
 byte_t operator_multi(byte_t a, byte_t b);
 
-void aes_128(byte_t plainText[4][4], byte_t key[4][4], bool encrypt);
+void aes_128(byte_t plainText[4][4], byte_t key[4][4], bool encrypt, bool printProcess);
 void printBlock(byte_t block[4][4]);

@@ -54,54 +54,73 @@ static const byte_t INVERSE_MIX_ARG[4][4] = {0x0e, 0x0b, 0x0d, 0x09,
 
 static const byte_t RCON[11] = {0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
 
-void aes_128(byte_t plainText[4][4], byte_t key[4][4], bool encrypt){
+void aes_128(byte_t plainText[4][4], byte_t key[4][4], bool encrypt, bool printProcess){
 	//参数初始化
 	int indexBegin = encrypt ? 0 : 10;
 	int step = encrypt ? 1 : -1;
 	byte_t roundKeys[11][4][4];
 
-	if(encrypt) cout << "CIPHER(ENCRYPT):" << endl;
-	else cout << "EQUIVALENT INVERSE CIPHER(DECRYPT):" << endl;
-
+	if(printProcess){
+		if (encrypt)
+			cout << "CIPHER(ENCRYPT):" << endl;
+		else
+			cout << "EQUIVALENT INVERSE CIPHER(DECRYPT):" << endl;
+	}
+	
 	//计算得到各轮密钥
 	key_expansion(key, roundKeys);
 	
-	cout << "round[ 0].input\t\t";
-	printBlock(plainText);
-	cout << "round[ 0].k_sch\t\t";
-	printBlock(roundKeys[indexBegin]);
-
+	if(printProcess){
+		cout << "round[ 0].input\t\t";
+		printBlock(plainText);
+		cout << "round[ 0].k_sch\t\t";
+		printBlock(roundKeys[indexBegin]);
+	}
+	
 	//第一次轮密钥加
 	add_round_key(plainText, roundKeys[indexBegin]);
 	//十次循环
 	for (int i = 1; i <= 10;i++){
-		cout << "round[" << setfill(' ') << setw(2) << dec << i << "].start\t\t";
-		printBlock(plainText);
+		if(printProcess){
+			cout << "round[" << setfill(' ') << setw(2) << dec << i << "].start\t\t";
+			printBlock(plainText);
+		}
 		
 		byte_sub(plainText, encrypt); 											//字节替换
-		cout << "round[" << setfill(' ') << setw(2) << dec << i << "].s_box\t\t";
-		printBlock(plainText);
+		if(printProcess){
+			cout << "round[" << setfill(' ') << setw(2) << dec << i << "].s_box\t\t";
+			printBlock(plainText);
+		}
 
 		shift_rows(plainText, encrypt); 										//行位移
-		cout << "round[" << setfill(' ') << setw(2) << dec << i << "].s_row\t\t";
-		printBlock(plainText);
+		if(printProcess){
+			cout << "round[" << setfill(' ') << setw(2) << dec << i << "].s_row\t\t";
+			printBlock(plainText);
+		}
 
 		if(i != 10){
 			mix_cols(plainText, encrypt); 										//列混淆(仅前九轮)
-			cout << "round[" << setfill(' ') << setw(2) << dec << i << "].m_col\t\t";
-			printBlock(plainText);
+			
+			if(printProcess){
+				cout << "round[" << setfill(' ') << setw(2) << dec << i << "].m_col\t\t";
+				printBlock(plainText);
+			}
 
 			if(!encrypt)														
 				mix_cols(roundKeys[indexBegin + step * i], encrypt);			//轮密钥逆向列混淆（针对前九轮且解密状态下）
 		}
-		cout << "round[" << setfill(' ') << setw(2) << dec << i << "].k_sch\t\t";
-		printBlock(roundKeys[indexBegin + step * i]);
+		if(printProcess){
+			cout << "round[" << setfill(' ') << setw(2) << dec << i << "].k_sch\t\t";
+			printBlock(roundKeys[indexBegin + step * i]);
+		}
 
 		add_round_key(plainText, roundKeys[indexBegin + step * i]);
 	}
 
-	cout << "round[10].output\t";
-	printBlock(plainText);
+	if(printProcess){
+		cout << "round[10].output\t";
+		printBlock(plainText);
+	}
 }
 
 //字节替换
