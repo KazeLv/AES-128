@@ -1,23 +1,12 @@
 //AES-128加密解密
-
 //密钥长度：16字节
-
 //加密轮数：10
-
-#include<iostream>
-#include<string>
+#include "aes128.h"
+#include <iostream>
+#include <iomanip>
+#include <string>
 
 using namespace std;
-
-using byte_t = unsigned char;
-using word_t = uint32_t;
-
-void byte_sub(byte_t block[4][4], bool encrypt);
-void shift_rows(byte_t block[4][4], bool encrypt);
-void mix_cols(byte_t block[4][4], bool encrypt);
-void add_round_key(byte_t block[4][4], byte_t key[4][4]);
-void key_expansion(byte_t key[4][4], byte_t result[11][4][4]);
-byte_t operator_multi(byte_t a, byte_t b);
 
 static const byte_t S_BOX[16][16] = {0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
 									 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -63,16 +52,7 @@ static const byte_t INVERSE_MIX_ARG[4][4] = {0x0e, 0x0b, 0x0d, 0x09,
 											 0x0d, 0x09, 0x0e, 0x0b,
 											 0x0b, 0x0d, 0x09, 0x0e};
 
-static const byte_t RCON[10] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
-
-int main(){
-	int blockCnt;
-	for (int i = 0; i < blockCnt; i++)
-	{
-		byte_t block[16];
-	}
-	return 0;
-}
+static const byte_t RCON[11] = {0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
 
 void aes_128(byte_t plainText[4][4], byte_t key[4][4], bool encrypt){
 	//参数初始化
@@ -80,21 +60,48 @@ void aes_128(byte_t plainText[4][4], byte_t key[4][4], bool encrypt){
 	int step = encrypt ? 1 : -1;
 	byte_t roundKeys[11][4][4];
 
+	if(encrypt) cout << "CIPHER(ENCRYPT):" << endl;
+	else cout << "EQUIVALENT INVERSE CIPHER(DECRYPT):" << endl;
+
 	//计算得到各轮密钥
 	key_expansion(key, roundKeys);
+	
+	cout << "round[ 0].input\t\t";
+	printBlock(plainText);
+	cout << "round[ 0].k_sch\t\t";
+	printBlock(roundKeys[indexBegin]);
+
 	//第一次轮密钥加
 	add_round_key(plainText, roundKeys[indexBegin]);
 	//十次循环
-	for (int i = 0; i < 10;i++){
-		byte_sub(plainText, encrypt);											//字节替换
-		shift_rows(plainText, encrypt);											//行位移
-		if(i != 9){
+	for (int i = 1; i <= 10;i++){
+		cout << "round[" << setfill(' ') << setw(2) << dec << i << "].start\t\t";
+		printBlock(plainText);
+		
+		byte_sub(plainText, encrypt); 											//字节替换
+		cout << "round[" << setfill(' ') << setw(2) << dec << i << "].s_box\t\t";
+		printBlock(plainText);
+
+		shift_rows(plainText, encrypt); 										//行位移
+		cout << "round[" << setfill(' ') << setw(2) << dec << i << "].s_row\t\t";
+		printBlock(plainText);
+
+		if(i != 10){
 			mix_cols(plainText, encrypt); 										//列混淆(仅前九轮)
+			cout << "round[" << setfill(' ') << setw(2) << dec << i << "].m_col\t\t";
+			printBlock(plainText);
+
 			if(!encrypt)														
-				mix_cols(roundKeys[indexBegin + step * (i + 1)], encrypt);		//轮密钥逆向列混淆（针对前九轮且解密状态下）
+				mix_cols(roundKeys[indexBegin + step * i], encrypt);			//轮密钥逆向列混淆（针对前九轮且解密状态下）
 		}
-		add_round_key(plainText, roundKeys[indexBegin + step * 10]);
+		cout << "round[" << setfill(' ') << setw(2) << dec << i << "].k_sch\t\t";
+		printBlock(roundKeys[indexBegin + step * i]);
+
+		add_round_key(plainText, roundKeys[indexBegin + step * i]);
 	}
+
+	cout << "round[10].output\t";
+	printBlock(plainText);
 }
 
 //字节替换
@@ -114,11 +121,20 @@ void byte_sub(byte_t block[4][4], bool encrypt){
 void shift_rows(byte_t block[4][4], bool encrypt){
 	for (int i = 0; i < 4; i++){
 		for (int j = 0; j < i; j++){
-			byte_t tmp = block[i][0];
-			block[i][0] = block[i][1];
-			block[i][1] = block[i][2];
-			block[i][2] = block[i][3];
-			block[i][3] = tmp;
+			if (encrypt) {
+				byte_t tmp = block[i][0];
+				block[i][0] = block[i][1];
+				block[i][1] = block[i][2];
+				block[i][2] = block[i][3];
+				block[i][3] = tmp;
+			}
+			else {
+				byte_t tmp = block[i][0];
+				block[i][0] = block[i][3];
+				block[i][3] = block[i][2];
+				block[i][2] = block[i][1];
+				block[i][1] = tmp;
+			}
 		}
 	}
 }
@@ -157,22 +173,25 @@ void add_round_key(byte_t block[4][4], byte_t key[4][4]){
 void key_expansion(byte_t key[4][4], byte_t result[11][4][4]){
 	word_t word_keys[44];
 	for (int i = 0; i < 4; i++){
-		word_keys[i] = key[i][0] << 24 + 
-					   key[i][1] << 16 + 
-					   key[i][2] << 8 + 
-					   key[i][3];
+		word_keys[i] = (word_t(key[0][i]) << 24) + 
+					   (word_t(key[1][i]) << 16) + 
+					   (word_t(key[2][i]) << 8) + 
+					   word_t(key[3][i]);
+
+		for (int j = 0; j < 4; j++) {
+			result[0][i][j] = key[i][j];
+		}
 	}
 
-	for (int i = 4; i <= 44; i++){
+	for (int i = 4; i < 44; i++){
 		word_t tmp = word_keys[i - 1];
 		if(i % 4 == 0){
 			//新一轮的开始，根据G函数流程计算异或操作数
 			byte_t word_tmp[4] = {
-				(tmp << 8 ) / 0x01000000,
-				(tmp << 16) / 0x01000000,
-				(tmp << 24) / 0x01000000,
-				tmp / 0x01000000,
-			};
+				tmp << 8 >> 24,
+				tmp << 16 >> 24,
+				tmp << 24 >> 24,
+				tmp >> 24 };
 
 			for (int i = 0; i < 4;i++){
 				int row = word_tmp[i] / 0x10;
@@ -181,16 +200,16 @@ void key_expansion(byte_t key[4][4], byte_t result[11][4][4]){
 			}
 
 			word_tmp[0] ^= RCON[i / 4];
-			tmp = (word_t)word_tmp[0] << 24;
-			tmp = (word_t)word_tmp[1] << 16;
-			tmp = (word_t)word_tmp[2] << 8;
-			tmp = (word_t)word_tmp[3];
+			tmp = (word_t(word_tmp[0]) << 24) +
+				  (word_t(word_tmp[1]) << 16) +
+			      (word_t(word_tmp[2]) << 8) +
+			      word_t(word_tmp[3]);
 		}
 
 		word_keys[i] = word_keys[i - 4] ^ tmp;
 
 		for (int j = 0; j < 4;j++)
-			result[i / 4][i % 4][j] = word_keys[i] << (j * 8) >> 24;
+			result[i / 4][j][i % 4] = word_keys[i] << (j * 8) >> 24;
 	}
 }
 
@@ -212,5 +231,14 @@ byte_t operator_multi(byte_t a, byte_t b){
 		b = b >> 1;
 	}
 	return res;
+}
+
+void printBlock(byte_t block[4][4]){
+	for (int i = 0; i < 4;i++){
+		for (int j = 0; j < 4;j++){
+			cout << setfill('0') << setw(2) << hex << (int)block[j][i];
+		}
+	}
+	cout << endl;
 }
 
