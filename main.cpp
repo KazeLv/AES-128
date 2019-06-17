@@ -5,12 +5,19 @@
 //加密轮数：10
 
 #include<iostream>
-#include<vector>
+#include<string>
 
 using namespace std;
 
 using byte_t = unsigned char;
 using word_t = uint32_t;
+
+void byte_sub(byte_t block[4][4], bool encrypt);
+void shift_rows(byte_t block[4][4], bool encrypt);
+void mix_cols(byte_t block[4][4], bool encrypt);
+void add_round_key(byte_t block[4][4], byte_t key[4][4]);
+void key_expansion(byte_t key[4][4], byte_t result[11][4][4]);
+byte_t operator_multi(byte_t a, byte_t b);
 
 static const byte_t S_BOX[16][16] = {0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
 									 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -59,24 +66,52 @@ static const byte_t INVERSE_MIX_ARG[4][4] = {0x0e, 0x0b, 0x0d, 0x09,
 static const byte_t RCON[10] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
 
 int main(){
+	int blockCnt;
+	for (int i = 0; i < blockCnt; i++)
+	{
+		byte_t block[16];
+	}
 	return 0;
 }
 
+void aes_128(byte_t plainText[4][4], byte_t key[4][4], bool encrypt){
+	//参数初始化
+	int indexBegin = encrypt ? 0 : 10;
+	int step = encrypt ? 1 : -1;
+	byte_t roundKeys[11][4][4];
+
+	//计算得到各轮密钥
+	key_expansion(key, roundKeys);
+	//第一次轮密钥加
+	add_round_key(plainText, roundKeys[indexBegin]);
+	//十次循环
+	for (int i = 0; i < 10;i++){
+		byte_sub(plainText, encrypt);											//字节替换
+		shift_rows(plainText, encrypt);											//行位移
+		if(i != 9){
+			mix_cols(plainText, encrypt); 										//列混淆(仅前九轮)
+			if(!encrypt)														
+				mix_cols(roundKeys[indexBegin + step * (i + 1)], encrypt);		//轮密钥逆向列混淆（针对前九轮且解密状态下）
+		}
+		add_round_key(plainText, roundKeys[indexBegin + step * 10]);
+	}
+}
+
 //字节替换
-void byte_sub(byte_t block[4][4])
-{
+void byte_sub(byte_t block[4][4], bool encrypt){
 	for (int i = 0; i < 4; i++){
 		for (int j = 0; j < 4; j++){
 			int row = block[i][j] / 16; 	//计算查表坐标
 			int col = block[i][j] % 16; 	//
 
-			block[i][j] = S_BOX[row][col];	//查表S-BOX替换字节
+			if(encrypt) block[i][j] = S_BOX[row][col];	//查表S-BOX替换字节
+			else block[i][j] = INVERSE_S_BOX[row][col];
 		}
 	}
 }
 
 //行位移
-void shift_rows(byte_t block[4][4]){
+void shift_rows(byte_t block[4][4], bool encrypt){
 	for (int i = 0; i < 4; i++){
 		for (int j = 0; j < i; j++){
 			byte_t tmp = block[i][0];
@@ -89,7 +124,7 @@ void shift_rows(byte_t block[4][4]){
 }
 
 //列混淆
-void mix_cols(byte_t block[4][4]){
+void mix_cols(byte_t block[4][4], bool encrypt){
 	//保存一份原始字节矩阵，逐一计算矩阵乘法结果
 	byte_t block_copy[4][4];
 	for (int i = 0; i < 4;i++){
@@ -103,7 +138,7 @@ void mix_cols(byte_t block[4][4]){
 	for (int i = 0; i < 4;i++){
 		for (int j = 0; j < 4;j++){
 			for (int k = 0; k < 4;k++){
-				block[i][j] ^= operator_multi(MIX_ARG[i][k], block_copy[k][j]);
+				block[i][j] ^= operator_multi(encrypt ? MIX_ARG[i][k] : INVERSE_MIX_ARG[i][k], block_copy[k][j]);
 			}
 		}
 	}
@@ -119,13 +154,13 @@ void add_round_key(byte_t block[4][4], byte_t key[4][4]){
 }
 
 //密钥拓展
-void key_expansion(byte_t key[16], byte_t result[176]){
+void key_expansion(byte_t key[4][4], byte_t result[11][4][4]){
 	word_t word_keys[44];
 	for (int i = 0; i < 4; i++){
-		word_keys[i] = key[4 * i + 0] << 24 + 
-					   key[4 * i + 1] << 16 + 
-					   key[4 * i + 2] << 8 + 
-					   key[4 * i + 3];
+		word_keys[i] = key[i][0] << 24 + 
+					   key[i][1] << 16 + 
+					   key[i][2] << 8 + 
+					   key[i][3];
 	}
 
 	for (int i = 4; i <= 44; i++){
@@ -153,9 +188,10 @@ void key_expansion(byte_t key[16], byte_t result[176]){
 		}
 
 		word_keys[i] = word_keys[i - 4] ^ tmp;
-	}
 
-	
+		for (int j = 0; j < 4;j++)
+			result[i / 4][i % 4][j] = word_keys[i] << (j * 8) >> 24;
+	}
 }
 
 //GF(2^8)乘法
